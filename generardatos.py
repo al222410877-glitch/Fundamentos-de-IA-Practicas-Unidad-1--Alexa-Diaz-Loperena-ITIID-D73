@@ -4,6 +4,16 @@ from faker import Faker
 import random
 from datetime import datetime, timedelta
 
+# ==========================================
+# MONGODB
+# ==========================================
+
+from pymongo import MongoClient
+from dotenv import load_dotenv
+from pathlib import Path
+from urllib.parse import quote_plus
+import os
+
 
 # ==========================================
 # CONFIGURACIÓN
@@ -13,34 +23,240 @@ fake = Faker("es_MX")
 
 
 # ==========================================
+# CONEXIÓN A MONGODB
+# ==========================================
+
+env_path= Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
+
+user = os.getenv("MONGO_USER")
+password = quote_plus(os.getenv("MONGO_PASSWORD"))
+cluster = os.getenv("MONGO_CLUSTER")
+database = os.getenv("MONGO_DB")
+collection_name = os.getenv("MONGO_COLLECTION")
+
+if not all([user, password, cluster, database, collection_name]):
+    raise ValueError("Faltan variables en el archivo .env")
+
+mongo_uri = f"mongodb+srv://{user}:{password}@{cluster}"
+client = MongoClient(mongo_uri)
+db = client[database]
+coleccion = db[collection_name]
+
+
+# ==========================================
 # FUNCIONES PARA GENERAR DATOS
 # ==========================================
 
 def generar_tk():
+
     return f"TK-{random.randint(10000, 99999)}"
 
 
 def generar_numero_cita():
+
     return random.randint(1000, 9999)
 
 
 def generar_consultorio():
+
     return random.randint(1, 20)
 
 
 def generar_piso():
+
     return random.randint(1, 5)
 
 
 def generar_fecha():
-    fecha = datetime.now() + timedelta(days=random.randint(1, 15))
+
+    fecha = datetime.now() + timedelta(
+        days=random.randint(1, 15)
+    )
+
     return fecha.strftime("%d/%m/%Y")
 
 
 def generar_hora():
+
     hora = random.randint(8, 17)
-    minutos = random.choice([0, 15, 30, 45])
+
+    minutos = random.choice(
+        [0, 15, 30, 45]
+    )
+
     return f"{hora:02d}:{minutos:02d}"
+
+
+# ==========================================
+# CRUD - INSERTAR
+# ==========================================
+
+def insertar_paciente(datos):
+
+    if coleccion is None:
+
+        messagebox.showerror(
+            "MongoDB",
+            "No hay conexión con MongoDB."
+        )
+
+        return None
+
+    try:
+
+        resultado = coleccion.insert_one(datos)
+
+        messagebox.showinfo(
+            "MongoDB",
+            "Paciente guardado correctamente."
+        )
+
+        return resultado.inserted_id
+
+    except Exception as e:
+
+        messagebox.showerror(
+            "MongoDB",
+            f"Error al guardar el paciente:\n\n{e}"
+        )
+
+        return None
+
+
+# ==========================================
+# CRUD - CONSULTAR
+# ==========================================
+
+def buscar_paciente(tk_numero):
+
+    if coleccion is None:
+
+        messagebox.showerror(
+            "MongoDB",
+            "No hay conexión con MongoDB."
+        )
+
+        return None
+
+    try:
+
+        paciente = coleccion.find_one(
+            {"tk": tk_numero}
+        )
+
+        return paciente
+
+    except Exception as e:
+
+        messagebox.showerror(
+            "MongoDB",
+            f"Error al consultar:\n\n{e}"
+        )
+
+        return None
+
+
+# ==========================================
+# CRUD - ACTUALIZAR
+# ==========================================
+
+def actualizar_paciente(
+    tk_numero,
+    nuevos_datos
+):
+
+    if coleccion is None:
+
+        messagebox.showerror(
+            "MongoDB",
+            "No hay conexión con MongoDB."
+        )
+
+        return
+
+    try:
+
+        resultado = coleccion.update_one(
+
+            {"tk": tk_numero},
+
+            {
+                "$set": nuevos_datos
+            }
+
+        )
+
+        if resultado.matched_count == 0:
+
+            messagebox.showwarning(
+                "MongoDB",
+                "No se encontró el paciente."
+            )
+
+        elif resultado.modified_count == 0:
+
+            messagebox.showinfo(
+                "MongoDB",
+                "El paciente existe, pero no hubo cambios."
+            )
+
+        else:
+
+            messagebox.showinfo(
+                "MongoDB",
+                "Paciente actualizado correctamente."
+            )
+
+    except Exception as e:
+
+        messagebox.showerror(
+            "MongoDB",
+            f"Error al actualizar:\n\n{e}"
+        )
+
+
+# ==========================================
+# CRUD - ELIMINAR
+# ==========================================
+
+def eliminar_paciente(tk_numero):
+
+    if coleccion is None:
+
+        messagebox.showerror(
+            "MongoDB",
+            "No hay conexión con MongoDB."
+        )
+
+        return
+
+    try:
+
+        resultado = coleccion.delete_one(
+            {"tk": tk_numero}
+        )
+
+        if resultado.deleted_count > 0:
+
+            messagebox.showinfo(
+                "MongoDB",
+                "Paciente eliminado correctamente."
+            )
+
+        else:
+
+            messagebox.showwarning(
+                "MongoDB",
+                "No se encontró el paciente."
+            )
+
+    except Exception as e:
+
+        messagebox.showerror(
+            "MongoDB",
+            f"Error al eliminar:\n\n{e}"
+        )
 
 
 # ==========================================
@@ -52,18 +268,35 @@ def realizar_diagnostico():
     nombre = entrada_nombre.get().strip()
 
     if nombre == "":
+
         messagebox.showwarning(
             "Dato faltante",
             "Por favor, escribe el nombre del paciente."
         )
+
         return
 
     try:
-        edad = int(entrada_edad.get())
-        oxigenacion = float(entrada_oxigenacion.get())
-        frecuencia = int(entrada_frecuencia.get())
-        peso = float(entrada_peso.get())
-        talla = float(entrada_talla.get())
+
+        edad = int(
+            entrada_edad.get()
+        )
+
+        oxigenacion = float(
+            entrada_oxigenacion.get()
+        )
+
+        frecuencia = int(
+            entrada_frecuencia.get()
+        )
+
+        peso = float(
+            entrada_peso.get()
+        )
+
+        talla = float(
+            entrada_talla.get()
+        )
 
         presion = entrada_presion.get().strip()
 
@@ -82,27 +315,43 @@ def realizar_diagnostico():
         if talla <= 0:
             raise ValueError
 
+
         # ==========================================
         # CALCULAR IMC
         # ==========================================
 
         talla_metros = talla / 100
-        imc = peso / (talla_metros ** 2)
+
+        imc = peso / (
+            talla_metros ** 2
+        )
+
 
         # ==========================================
         # ANALIZAR PRESIÓN
         # ==========================================
 
         try:
+
             sistolica, diastolica = presion.split("/")
-            sistolica = int(sistolica)
-            diastolica = int(diastolica)
+
+            sistolica = int(
+                sistolica
+            )
+
+            diastolica = int(
+                diastolica
+            )
+
         except:
+
             messagebox.showwarning(
                 "Presión incorrecta",
                 "Escribe la presión en formato 120/80."
             )
+
             return
+
 
         # ==========================================
         # RESULTADOS
@@ -112,51 +361,72 @@ def realizar_diagnostico():
 
         menu_destino = "Cita"
 
-        # Oxigenación
+
+        # ==========================================
+        # OXIGENACIÓN
+        # ==========================================
+
         if oxigenacion < 90:
+
             resultados.append(
-                " Oxigenación baja."
+                "Oxigenación baja."
             )
+
             menu_destino = "Urgencias"
 
         elif oxigenacion < 95:
+
             resultados.append(
-                " Oxigenación ligeramente baja. "
+                "Oxigenación ligeramente baja. "
                 "Se recomienda valoración médica."
             )
 
         else:
+
             resultados.append(
                 "Oxigenación dentro del rango esperado."
             )
 
-        # Frecuencia cardiaca
+
+        # ==========================================
+        # FRECUENCIA CARDIACA
+        # ==========================================
+
         if frecuencia < 60:
+
             resultados.append(
-                " Frecuencia cardiaca baja."
+                "Frecuencia cardiaca baja."
             )
 
             if menu_destino != "Urgencias":
+
                 menu_destino = "Cita"
 
         elif frecuencia > 100:
+
             resultados.append(
-                " Frecuencia cardiaca elevada."
+                "Frecuencia cardiaca elevada."
             )
 
             if frecuencia > 120:
+
                 menu_destino = "Urgencias"
 
         else:
+
             resultados.append(
                 "Frecuencia cardiaca dentro del rango esperado."
             )
 
-        # Presión arterial
+
+        # ==========================================
+        # PRESIÓN ARTERIAL
+        # ==========================================
+
         if sistolica >= 180 or diastolica >= 120:
 
             resultados.append(
-                " Presión arterial muy elevada."
+                "Presión arterial muy elevada."
             )
 
             menu_destino = "Urgencias"
@@ -164,16 +434,19 @@ def realizar_diagnostico():
         elif sistolica >= 140 or diastolica >= 90:
 
             resultados.append(
-                " Presión arterial elevada."
+                "Presión arterial elevada."
             )
 
             if menu_destino != "Urgencias":
+
                 menu_destino = "Cita"
 
         else:
+
             resultados.append(
                 "Presión arterial dentro del rango esperado."
             )
+
 
         # ==========================================
         # IMC
@@ -186,19 +459,21 @@ def realizar_diagnostico():
         if imc >= 30:
 
             resultados.append(
-                " Resultado orientativo: posible obesidad."
+                "Resultado orientativo: posible obesidad."
             )
 
             if menu_destino != "Urgencias":
+
                 menu_destino = "Cita"
 
         elif imc >= 25:
 
             resultados.append(
-                " Resultado orientativo: sobrepeso."
+                "Resultado orientativo: sobrepeso."
             )
 
             if menu_destino != "Urgencias":
+
                 menu_destino = "Cita"
 
         else:
@@ -207,37 +482,107 @@ def realizar_diagnostico():
                 "IMC dentro del rango considerado normal."
             )
 
+
         # ==========================================
         # GENERAR CITA / TK
         # ==========================================
 
         tk_numero = generar_tk()
+
         numero_cita = generar_numero_cita()
+
         consultorio = generar_consultorio()
+
         piso = generar_piso()
+
         fecha = generar_fecha()
+
         hora = generar_hora()
+
+
+        # ==========================================
+        # DATOS PARA MONGODB
+        # ==========================================
+
+        datos_paciente = {
+
+            "nombre": nombre,
+
+            "edad": edad,
+
+            "oxigenacion": oxigenacion,
+
+            "frecuencia_cardiaca": frecuencia,
+
+            "presion_arterial": presion,
+
+            "peso": peso,
+
+            "talla": talla,
+
+            "imc": round(imc, 2),
+
+            "destino": menu_destino,
+
+            "tk": tk_numero,
+
+            "numero_cita": numero_cita,
+
+            "consultorio": consultorio,
+
+            "piso": piso,
+
+            "fecha": fecha,
+
+            "hora": hora,
+
+            "resultados": resultados,
+
+            "fecha_registro": datetime.now()
+
+        }
+
+
+        # ==========================================
+        # INSERTAR EN MONGODB
+        # ==========================================
+
+        insertar_paciente(
+            datos_paciente
+        )
+
 
         # ==========================================
         # MOSTRAR INFORMACIÓN
         # ==========================================
 
         texto = f"""
- ASISTENTE HOSPITALARIO
+
+ASISTENTE HOSPITALARIO
+
 
 Paciente: {nombre}
+
 Edad: {edad} años
+
 
 ----------------------------------------
 SIGNOS Y MEDIDAS
 ----------------------------------------
 
+
 Oxigenación: {oxigenacion} %
+
 Frecuencia cardiaca: {frecuencia} lpm
+
 Presión arterial: {presion}
+
 Peso: {peso} kg
+
 Talla: {talla} cm
+
 IMC: {imc:.2f}
+
 
 ----------------------------------------
 RESULTADO
@@ -246,59 +591,99 @@ RESULTADO
 """
 
         for resultado in resultados:
+
             texto += resultado + "\n"
+
 
         texto += f"""
 
 ----------------------------------------
 DESTINO RECOMENDADO
 ----------------------------------------
- {menu_destino}
+
+{menu_destino}
+
 
 ----------------------------------------
 DATOS DE LA CITA
 ----------------------------------------
 
- TK: {tk_numero}
- Número de cita: {numero_cita}
- Consultorio: {consultorio}
- Piso: {piso}
- Fecha: {fecha}
- Hora: {hora}
+
+TK: {tk_numero}
+
+Número de cita: {numero_cita}
+
+Consultorio: {consultorio}
+
+Piso: {piso}
+
+Fecha: {fecha}
+
+Hora: {hora}
 
 """
+
 
         if menu_destino == "Urgencias":
 
             texto += """
+
 El resultado requiere atención prioritaria.
 
 Dirígete al área de URGENCIAS.
 
 Si se trata de una emergencia real,
 solicita atención médica inmediata.
+
 """
 
         elif menu_destino == "Cita":
 
             texto += """
+
 Se recomienda acudir a la CITA
 generada para valoración profesional.
+
 """
 
-        resultado_texto.config(state="normal")
-        resultado_texto.delete("1.0", tk.END)
-        resultado_texto.insert(tk.END, texto)
-        resultado_texto.config(state="disabled")
 
-        # Guardar datos para los botones
+        resultado_texto.config(
+            state="normal"
+        )
+
+        resultado_texto.delete(
+            "1.0",
+            tk.END
+        )
+
+        resultado_texto.insert(
+            tk.END,
+            texto
+        )
+
+        resultado_texto.config(
+            state="disabled"
+        )
+
+
+        # ==========================================
+        # GUARDAR DATOS PARA LOS BOTONES
+        # ==========================================
+
         datos_cita["tk"] = tk_numero
+
         datos_cita["numero"] = numero_cita
+
         datos_cita["consultorio"] = consultorio
+
         datos_cita["piso"] = piso
+
         datos_cita["fecha"] = fecha
+
         datos_cita["hora"] = hora
+
         datos_cita["destino"] = menu_destino
+
 
     except ValueError:
 
@@ -309,16 +694,420 @@ generada para valoración profesional.
 
 
 # ==========================================
+# CONSULTAR PACIENTE
+# ==========================================
+
+def consultar_paciente():
+
+    ventana = tk.Toplevel(root)
+
+    ventana.title(
+        "Consultar paciente"
+    )
+
+    ventana.geometry(
+        "500x450"
+    )
+
+    ventana.resizable(
+        False,
+        False
+    )
+
+    ventana.configure(
+        bg="#EAF4FF"
+    )
+
+
+    tk.Label(
+        ventana,
+        text="CONSULTAR PACIENTE",
+        font=("Arial", 20, "bold"),
+        bg="#EAF4FF",
+        fg="#123A5B"
+    ).pack(pady=20)
+
+
+    tk.Label(
+        ventana,
+        text="Ingresa el TK del paciente:",
+        font=("Arial", 12),
+        bg="#EAF4FF",
+        fg="#234D69"
+    ).pack(pady=5)
+
+
+    entrada_tk = tk.Entry(
+        ventana,
+        width=30,
+        font=("Arial", 11)
+    )
+
+    entrada_tk.pack(
+        pady=10
+    )
+
+
+    resultado = tk.Text(
+        ventana,
+        width=55,
+        height=14,
+        font=("Consolas", 9)
+    )
+
+    resultado.pack(
+        pady=10
+    )
+
+
+    def buscar():
+
+        tk_numero = entrada_tk.get().strip()
+
+        if tk_numero == "":
+
+            messagebox.showwarning(
+                "Dato faltante",
+                "Ingresa un TK."
+            )
+
+            return
+
+
+        paciente = buscar_paciente(
+            tk_numero
+        )
+
+
+        if paciente:
+
+            paciente.pop(
+                "_id",
+                None
+            )
+
+            resultado.delete(
+                "1.0",
+                tk.END
+            )
+
+            for clave, valor in paciente.items():
+
+                resultado.insert(
+                    tk.END,
+                    f"{clave}: {valor}\n"
+                )
+
+
+    tk.Button(
+        ventana,
+        text="Buscar",
+        command=buscar,
+        width=20,
+        bg="#00A6A6",
+        fg="white",
+        font=("Arial", 11, "bold"),
+        relief="flat",
+        bd=0
+    ).pack(pady=10)
+
+
+# ==========================================
+# ACTUALIZAR PACIENTE
+# ==========================================
+
+def actualizar_desde_ventana():
+
+    ventana = tk.Toplevel(root)
+
+    ventana.title(
+        "Actualizar paciente"
+    )
+
+    ventana.geometry(
+        "500x450"
+    )
+
+    ventana.resizable(
+        False,
+        False
+    )
+
+    ventana.configure(
+        bg="#EAF4FF"
+    )
+
+
+    tk.Label(
+        ventana,
+        text="ACTUALIZAR PACIENTE",
+        font=("Arial", 20, "bold"),
+        bg="#EAF4FF",
+        fg="#123A5B"
+    ).pack(pady=20)
+
+
+    tk.Label(
+        ventana,
+        text="TK del paciente:",
+        bg="#EAF4FF",
+        fg="#234D69"
+    ).pack()
+
+
+    entrada_tk = tk.Entry(
+        ventana,
+        width=30
+    )
+
+    entrada_tk.pack(
+        pady=8
+    )
+
+
+    tk.Label(
+        ventana,
+        text="Nuevo nombre:",
+        bg="#EAF4FF",
+        fg="#234D69"
+    ).pack()
+
+
+    entrada_nombre = tk.Entry(
+        ventana,
+        width=30
+    )
+
+    entrada_nombre.pack(
+        pady=8
+    )
+
+
+    tk.Label(
+        ventana,
+        text="Nueva edad:",
+        bg="#EAF4FF",
+        fg="#234D69"
+    ).pack()
+
+
+    entrada_edad = tk.Entry(
+        ventana,
+        width=30
+    )
+
+    entrada_edad.pack(
+        pady=8
+    )
+
+
+    tk.Label(
+        ventana,
+        text="Nuevo peso:",
+        bg="#EAF4FF",
+        fg="#234D69"
+    ).pack()
+
+
+    entrada_peso = tk.Entry(
+        ventana,
+        width=30
+    )
+
+    entrada_peso.pack(
+        pady=8
+    )
+
+
+    def actualizar():
+
+        tk_numero = entrada_tk.get().strip()
+
+        nombre = entrada_nombre.get().strip()
+
+
+        if tk_numero == "":
+
+            messagebox.showwarning(
+                "Dato faltante",
+                "Ingresa el TK."
+            )
+
+            return
+
+
+        try:
+
+            edad = int(
+                entrada_edad.get()
+            )
+
+            peso = float(
+                entrada_peso.get()
+            )
+
+        except ValueError:
+
+            messagebox.showerror(
+                "Error",
+                "Edad y peso deben ser números."
+            )
+
+            return
+
+
+        nuevos_datos = {
+
+            "nombre": nombre,
+
+            "edad": edad,
+
+            "peso": peso
+
+        }
+
+
+        actualizar_paciente(
+            tk_numero,
+            nuevos_datos
+        )
+
+
+    tk.Button(
+        ventana,
+        text="Actualizar",
+        command=actualizar,
+        width=20,
+        bg="#3A86FF",
+        fg="white",
+        font=("Arial", 11, "bold"),
+        relief="flat",
+        bd=0
+    ).pack(pady=20)
+
+
+# ==========================================
+# ELIMINAR PACIENTE
+# ==========================================
+
+def eliminar_desde_ventana():
+
+    ventana = tk.Toplevel(root)
+
+    ventana.title(
+        "Eliminar paciente"
+    )
+
+    ventana.geometry(
+        "400x250"
+    )
+
+    ventana.resizable(
+        False,
+        False
+    )
+
+    ventana.configure(
+        bg="#EAF4FF"
+    )
+
+
+    tk.Label(
+        ventana,
+        text="ELIMINAR PACIENTE",
+        font=("Arial", 20, "bold"),
+        bg="#EAF4FF",
+        fg="#123A5B"
+    ).pack(pady=20)
+
+
+    tk.Label(
+        ventana,
+        text="Ingresa el TK:",
+        font=("Arial", 12),
+        bg="#EAF4FF",
+        fg="#234D69"
+    ).pack()
+
+
+    entrada_tk = tk.Entry(
+        ventana,
+        width=30
+    )
+
+    entrada_tk.pack(
+        pady=10
+    )
+
+
+    def eliminar():
+
+        tk_numero = entrada_tk.get().strip()
+
+
+        if tk_numero == "":
+
+            messagebox.showwarning(
+                "Dato faltante",
+                "Ingresa el TK."
+            )
+
+            return
+
+
+        confirmar = messagebox.askyesno(
+            "Confirmar",
+            "¿Seguro que deseas eliminar este paciente?"
+        )
+
+
+        if confirmar:
+
+            eliminar_paciente(
+                tk_numero
+            )
+
+            ventana.destroy()
+
+
+    tk.Button(
+        ventana,
+        text="Eliminar",
+        command=eliminar,
+        width=20,
+        bg="#E63946",
+        fg="white",
+        font=("Arial", 11, "bold"),
+        relief="flat",
+        bd=0
+    ).pack(pady=20)
+
+
+# ==========================================
 # URGENCIAS
 # ==========================================
 
 def abrir_urgencias():
 
     ventana = tk.Toplevel(root)
-    ventana.title("Urgencias")
-    ventana.geometry("500x400")
-    ventana.resizable(False, False)
-    ventana.configure(bg="#EAF4FF")
+
+    ventana.title(
+        "Urgencias"
+    )
+
+    ventana.geometry(
+        "500x400"
+    )
+
+    ventana.resizable(
+        False,
+        False
+    )
+
+    ventana.configure(
+        bg="#EAF4FF"
+    )
+
 
     tk.Label(
         ventana,
@@ -328,6 +1117,7 @@ def abrir_urgencias():
         fg="#123A5B"
     ).pack(pady=20)
 
+
     tk.Label(
         ventana,
         text="Selecciona el motivo de atención:",
@@ -336,22 +1126,35 @@ def abrir_urgencias():
         fg="#234D69"
     ).pack(pady=10)
 
+
     motivos = [
+
         "Dificultad para respirar",
+
         "Dolor intenso",
+
         "Presión arterial muy elevada",
+
         "Frecuencia cardiaca alterada",
+
         "Otro"
+
     ]
 
+
     motivo = tk.StringVar()
-    motivo.set(motivos[0])
+
+    motivo.set(
+        motivos[0]
+    )
+
 
     menu = tk.OptionMenu(
         ventana,
         motivo,
         *motivos
     )
+
 
     menu.config(
         width=35,
@@ -362,7 +1165,10 @@ def abrir_urgencias():
         activebackground="#D5E8FF"
     )
 
-    menu.pack(pady=10)
+    menu.pack(
+        pady=10
+    )
+
 
     def confirmar():
 
@@ -373,6 +1179,7 @@ def abrir_urgencias():
             f"El paciente debe ser valorado por "
             f"personal médico."
         )
+
 
     tk.Button(
         ventana,
@@ -386,7 +1193,10 @@ def abrir_urgencias():
         activeforeground="white",
         relief="flat",
         bd=0
-    ).pack(pady=25)
+    ).pack(
+        pady=25
+    )
+
 
     tk.Button(
         ventana,
@@ -409,10 +1219,24 @@ def abrir_urgencias():
 def abrir_cita():
 
     ventana = tk.Toplevel(root)
-    ventana.title("Cita médica")
-    ventana.geometry("500x500")
-    ventana.resizable(False, False)
-    ventana.configure(bg="#EAF4FF")
+
+    ventana.title(
+        "Cita médica"
+    )
+
+    ventana.geometry(
+        "500x500"
+    )
+
+    ventana.resizable(
+        False,
+        False
+    )
+
+    ventana.configure(
+        bg="#EAF4FF"
+    )
+
 
     tk.Label(
         ventana,
@@ -420,28 +1244,39 @@ def abrir_cita():
         font=("Arial", 22, "bold"),
         bg="#EAF4FF",
         fg="#123A5B"
-    ).pack(pady=20)
+    ).pack(
+        pady=20
+    )
+
 
     if "numero" in datos_cita:
 
         informacion = f"""
- TK: {datos_cita['tk']}
+
+TK: {datos_cita['tk']}
+
 
 Número de cita:
 {datos_cita['numero']}
 
+
 Consultorio:
 {datos_cita['consultorio']}
+
 
 Piso:
 {datos_cita['piso']}
 
+
 Fecha:
 {datos_cita['fecha']}
 
+
 Hora:
 {datos_cita['hora']}
+
 """
+
 
         tk.Label(
             ventana,
@@ -450,7 +1285,10 @@ Hora:
             justify="left",
             bg="#EAF4FF",
             fg="#123A5B"
-        ).pack(pady=10)
+        ).pack(
+            pady=10
+        )
+
 
     else:
 
@@ -460,7 +1298,10 @@ Hora:
             font=("Arial", 13),
             bg="#EAF4FF",
             fg="#234D69"
-        ).pack(pady=30)
+        ).pack(
+            pady=30
+        )
+
 
     tk.Button(
         ventana,
@@ -473,7 +1314,9 @@ Hora:
         activeforeground="white",
         relief="flat",
         bd=0
-    ).pack(pady=20)
+    ).pack(
+        pady=20
+    )
 
 
 # ==========================================
@@ -483,10 +1326,24 @@ Hora:
 def abrir_farmacia():
 
     ventana = tk.Toplevel(root)
-    ventana.title("Farmacia")
-    ventana.geometry("500x400")
-    ventana.resizable(False, False)
-    ventana.configure(bg="#EAF4FF")
+
+    ventana.title(
+        "Farmacia"
+    )
+
+    ventana.geometry(
+        "500x400"
+    )
+
+    ventana.resizable(
+        False,
+        False
+    )
+
+    ventana.configure(
+        bg="#EAF4FF"
+    )
+
 
     tk.Label(
         ventana,
@@ -494,7 +1351,10 @@ def abrir_farmacia():
         font=("Arial", 22, "bold"),
         bg="#EAF4FF",
         fg="#123A5B"
-    ).pack(pady=20)
+    ).pack(
+        pady=20
+    )
+
 
     tk.Label(
         ventana,
@@ -502,22 +1362,36 @@ def abrir_farmacia():
         font=("Arial", 12),
         bg="#EAF4FF",
         fg="#234D69"
-    ).pack(pady=10)
+    ).pack(
+        pady=10
+    )
+
 
     opciones = [
+
         "Consultar medicamento",
+
         "Consultar disponibilidad",
+
         "Información general"
+
     ]
 
+
     opcion = tk.StringVar()
-    opcion.set(opciones[0])
+
+    opcion.set(
+        opciones[0]
+    )
+
 
     menu = tk.OptionMenu(
         ventana,
         opcion,
         *opciones
     )
+
+
     menu.config(
         width=30,
         font=("Arial", 11),
@@ -526,7 +1400,11 @@ def abrir_farmacia():
         highlightbackground="#D5E8FF",
         activebackground="#D5E8FF"
     )
-    menu.pack(pady=15)
+
+    menu.pack(
+        pady=15
+    )
+
 
     def consultar():
 
@@ -536,6 +1414,7 @@ def abrir_farmacia():
             f"{opcion.get()}\n\n"
             f"Consulta con el personal de farmacia."
         )
+
 
     tk.Button(
         ventana,
@@ -549,7 +1428,10 @@ def abrir_farmacia():
         activeforeground="white",
         relief="flat",
         bd=0
-    ).pack(pady=20)
+    ).pack(
+        pady=20
+    )
+
 
     tk.Button(
         ventana,
@@ -572,10 +1454,24 @@ def abrir_farmacia():
 def abrir_rayos_x():
 
     ventana = tk.Toplevel(root)
-    ventana.title("Rayos X")
-    ventana.geometry("500x400")
-    ventana.resizable(False, False)
-    ventana.configure(bg="#EAF4FF")
+
+    ventana.title(
+        "Rayos X"
+    )
+
+    ventana.geometry(
+        "500x400"
+    )
+
+    ventana.resizable(
+        False,
+        False
+    )
+
+    ventana.configure(
+        bg="#EAF4FF"
+    )
+
 
     tk.Label(
         ventana,
@@ -583,7 +1479,10 @@ def abrir_rayos_x():
         font=("Arial", 22, "bold"),
         bg="#EAF4FF",
         fg="#123A5B"
-    ).pack(pady=20)
+    ).pack(
+        pady=20
+    )
+
 
     tk.Label(
         ventana,
@@ -591,7 +1490,10 @@ def abrir_rayos_x():
         font=("Arial", 13),
         bg="#EAF4FF",
         fg="#234D69"
-    ).pack(pady=20)
+    ).pack(
+        pady=20
+    )
+
 
     tk.Label(
         ventana,
@@ -601,7 +1503,10 @@ def abrir_rayos_x():
         justify="center",
         bg="#EAF4FF",
         fg="#234D69"
-    ).pack(pady=10)
+    ).pack(
+        pady=10
+    )
+
 
     tk.Button(
         ventana,
@@ -618,7 +1523,9 @@ def abrir_rayos_x():
         activeforeground="white",
         relief="flat",
         bd=0
-    ).pack(pady=20)
+    ).pack(
+        pady=20
+    )
 
 
 # ==========================================
@@ -628,10 +1535,24 @@ def abrir_rayos_x():
 def abrir_tomografia():
 
     ventana = tk.Toplevel(root)
-    ventana.title("Tomografía")
-    ventana.geometry("500x400")
-    ventana.resizable(False, False)
-    ventana.configure(bg="#EAF4FF")
+
+    ventana.title(
+        "Tomografía"
+    )
+
+    ventana.geometry(
+        "500x400"
+    )
+
+    ventana.resizable(
+        False,
+        False
+    )
+
+    ventana.configure(
+        bg="#EAF4FF"
+    )
+
 
     tk.Label(
         ventana,
@@ -639,7 +1560,10 @@ def abrir_tomografia():
         font=("Arial", 22, "bold"),
         bg="#EAF4FF",
         fg="#123A5B"
-    ).pack(pady=20)
+    ).pack(
+        pady=20
+    )
+
 
     tk.Label(
         ventana,
@@ -647,7 +1571,10 @@ def abrir_tomografia():
         font=("Arial", 13),
         bg="#EAF4FF",
         fg="#234D69"
-    ).pack(pady=20)
+    ).pack(
+        pady=20
+    )
+
 
     tk.Label(
         ventana,
@@ -657,7 +1584,10 @@ def abrir_tomografia():
         justify="center",
         bg="#EAF4FF",
         fg="#234D69"
-    ).pack(pady=10)
+    ).pack(
+        pady=10
+    )
+
 
     tk.Button(
         ventana,
@@ -674,7 +1604,9 @@ def abrir_tomografia():
         activeforeground="white",
         relief="flat",
         bd=0
-    ).pack(pady=20)
+    ).pack(
+        pady=20
+    )
 
 
 # ==========================================
@@ -684,10 +1616,24 @@ def abrir_tomografia():
 def abrir_estudios():
 
     ventana = tk.Toplevel(root)
-    ventana.title("Estudios")
-    ventana.geometry("500x450")
-    ventana.resizable(False, False)
-    ventana.configure(bg="#EAF4FF")
+
+    ventana.title(
+        "Estudios"
+    )
+
+    ventana.geometry(
+        "500x450"
+    )
+
+    ventana.resizable(
+        False,
+        False
+    )
+
+    ventana.configure(
+        bg="#EAF4FF"
+    )
+
 
     tk.Label(
         ventana,
@@ -695,7 +1641,10 @@ def abrir_estudios():
         font=("Arial", 22, "bold"),
         bg="#EAF4FF",
         fg="#123A5B"
-    ).pack(pady=20)
+    ).pack(
+        pady=20
+    )
+
 
     tk.Label(
         ventana,
@@ -703,7 +1652,10 @@ def abrir_estudios():
         font=("Arial", 13),
         bg="#EAF4FF",
         fg="#234D69"
-    ).pack(pady=15)
+    ).pack(
+        pady=15
+    )
+
 
     tk.Button(
         ventana,
@@ -718,7 +1670,10 @@ def abrir_estudios():
         activeforeground="white",
         relief="flat",
         bd=0
-    ).pack(pady=10)
+    ).pack(
+        pady=10
+    )
+
 
     tk.Button(
         ventana,
@@ -733,7 +1688,10 @@ def abrir_estudios():
         activeforeground="white",
         relief="flat",
         bd=0
-    ).pack(pady=10)
+    ).pack(
+        pady=10
+    )
+
 
     tk.Button(
         ventana,
@@ -746,7 +1704,9 @@ def abrir_estudios():
         activeforeground="white",
         relief="flat",
         bd=0
-    ).pack(pady=20)
+    ).pack(
+        pady=20
+    )
 
 
 # ==========================================
@@ -755,17 +1715,55 @@ def abrir_estudios():
 
 def limpiar():
 
-    entrada_nombre.delete(0, tk.END)
-    entrada_edad.delete(0, tk.END)
-    entrada_oxigenacion.delete(0, tk.END)
-    entrada_frecuencia.delete(0, tk.END)
-    entrada_presion.delete(0, tk.END)
-    entrada_peso.delete(0, tk.END)
-    entrada_talla.delete(0, tk.END)
+    entrada_nombre.delete(
+        0,
+        tk.END
+    )
 
-    resultado_texto.config(state="normal")
-    resultado_texto.delete("1.0", tk.END)
-    resultado_texto.config(state="disabled")
+    entrada_edad.delete(
+        0,
+        tk.END
+    )
+
+    entrada_oxigenacion.delete(
+        0,
+        tk.END
+    )
+
+    entrada_frecuencia.delete(
+        0,
+        tk.END
+    )
+
+    entrada_presion.delete(
+        0,
+        tk.END
+    )
+
+    entrada_peso.delete(
+        0,
+        tk.END
+    )
+
+    entrada_talla.delete(
+        0,
+        tk.END
+    )
+
+
+    resultado_texto.config(
+        state="normal"
+    )
+
+    resultado_texto.delete(
+        "1.0",
+        tk.END
+    )
+
+    resultado_texto.config(
+        state="disabled"
+    )
+
 
     datos_cita.clear()
 
@@ -776,12 +1774,26 @@ def limpiar():
 
 root = tk.Tk()
 
-root.title("Asistente Hospitalario IA")
-root.geometry("950x750")
-root.resizable(False, False)
-root.configure(bg="#EAF4FF")
+root.title(
+    "Asistente Hospitalario IA"
+)
+
+root.geometry(
+    "950x850"
+)
+
+root.resizable(
+    False,
+    False
+)
+
+root.configure(
+    bg="#EAF4FF"
+)
+
 
 # Diccionario para almacenar la cita
+
 datos_cita = {}
 
 
@@ -797,7 +1809,10 @@ titulo = tk.Label(
     fg="#123A5B"
 )
 
-titulo.pack(pady=15)
+titulo.pack(
+    pady=15
+)
+
 
 subtitulo = tk.Label(
     root,
@@ -807,16 +1822,22 @@ subtitulo = tk.Label(
     fg="#234D69"
 )
 
-subtitulo.pack(pady=5)
+subtitulo.pack(
+    pady=5
+)
 
 
 # ==========================================
 # CONTENEDOR PRINCIPAL
 # ==========================================
 
-frame_principal = tk.Frame(root)
+frame_principal = tk.Frame(
+    root
+)
 
-frame_principal.pack(pady=15)
+frame_principal.pack(
+    pady=15
+)
 
 
 # ==========================================
@@ -839,7 +1860,10 @@ frame_datos.grid(
 )
 
 
-# Nombre
+# ==========================================
+# NOMBRE
+# ==========================================
+
 tk.Label(
     frame_datos,
     text="Nombre:"
@@ -849,6 +1873,7 @@ tk.Label(
     sticky="w",
     pady=8
 )
+
 
 entrada_nombre = tk.Entry(
     frame_datos,
@@ -862,7 +1887,10 @@ entrada_nombre.grid(
 )
 
 
-# Edad
+# ==========================================
+# EDAD
+# ==========================================
+
 tk.Label(
     frame_datos,
     text="Edad:"
@@ -872,6 +1900,7 @@ tk.Label(
     sticky="w",
     pady=8
 )
+
 
 entrada_edad = tk.Entry(
     frame_datos,
@@ -885,7 +1914,10 @@ entrada_edad.grid(
 )
 
 
-# Oxigenación
+# ==========================================
+# OXIGENACIÓN
+# ==========================================
+
 tk.Label(
     frame_datos,
     text="Oxigenación (%):"
@@ -895,6 +1927,7 @@ tk.Label(
     sticky="w",
     pady=8
 )
+
 
 entrada_oxigenacion = tk.Entry(
     frame_datos,
@@ -908,7 +1941,10 @@ entrada_oxigenacion.grid(
 )
 
 
-# Frecuencia cardiaca
+# ==========================================
+# FRECUENCIA CARDIACA
+# ==========================================
+
 tk.Label(
     frame_datos,
     text="Frecuencia cardiaca:"
@@ -918,6 +1954,7 @@ tk.Label(
     sticky="w",
     pady=8
 )
+
 
 entrada_frecuencia = tk.Entry(
     frame_datos,
@@ -931,7 +1968,10 @@ entrada_frecuencia.grid(
 )
 
 
-# Presión
+# ==========================================
+# PRESIÓN
+# ==========================================
+
 tk.Label(
     frame_datos,
     text="Presión arterial:"
@@ -942,12 +1982,16 @@ tk.Label(
     pady=8
 )
 
+
 entrada_presion = tk.Entry(
     frame_datos,
     width=30
 )
 
-entrada_presion.insert(0, "120/80")
+entrada_presion.insert(
+    0,
+    "120/80"
+)
 
 entrada_presion.grid(
     row=4,
@@ -956,7 +2000,10 @@ entrada_presion.grid(
 )
 
 
-# Peso
+# ==========================================
+# PESO
+# ==========================================
+
 tk.Label(
     frame_datos,
     text="Peso (kg):"
@@ -966,6 +2013,7 @@ tk.Label(
     sticky="w",
     pady=8
 )
+
 
 entrada_peso = tk.Entry(
     frame_datos,
@@ -979,7 +2027,10 @@ entrada_peso.grid(
 )
 
 
-# Talla
+# ==========================================
+# TALLA
+# ==========================================
+
 tk.Label(
     frame_datos,
     text="Talla (cm):"
@@ -989,6 +2040,7 @@ tk.Label(
     sticky="w",
     pady=8
 )
+
 
 entrada_talla = tk.Entry(
     frame_datos,
@@ -1018,6 +2070,10 @@ frame_botones.grid(
 )
 
 
+# ==========================================
+# DIAGNÓSTICO
+# ==========================================
+
 tk.Button(
     frame_botones,
     text="Realizar diagnóstico",
@@ -1031,8 +2087,14 @@ tk.Button(
     activeforeground="white",
     relief="flat",
     bd=0
-).pack(pady=8)
+).pack(
+    pady=8
+)
 
+
+# ==========================================
+# URGENCIAS
+# ==========================================
 
 tk.Button(
     frame_botones,
@@ -1046,8 +2108,14 @@ tk.Button(
     activeforeground="white",
     relief="flat",
     bd=0
-).pack(pady=8)
+).pack(
+    pady=8
+)
 
+
+# ==========================================
+# CITA
+# ==========================================
 
 tk.Button(
     frame_botones,
@@ -1061,8 +2129,14 @@ tk.Button(
     activeforeground="white",
     relief="flat",
     bd=0
-).pack(pady=8)
+).pack(
+    pady=8
+)
 
+
+# ==========================================
+# FARMACIA
+# ==========================================
 
 tk.Button(
     frame_botones,
@@ -1076,8 +2150,14 @@ tk.Button(
     activeforeground="white",
     relief="flat",
     bd=0
-).pack(pady=8)
+).pack(
+    pady=8
+)
 
+
+# ==========================================
+# ESTUDIOS
+# ==========================================
 
 tk.Button(
     frame_botones,
@@ -1091,8 +2171,14 @@ tk.Button(
     activeforeground="white",
     relief="flat",
     bd=0
-).pack(pady=8)
+).pack(
+    pady=8
+)
 
+
+# ==========================================
+# NUEVO PACIENTE
+# ==========================================
 
 tk.Button(
     frame_botones,
@@ -1106,8 +2192,71 @@ tk.Button(
     activeforeground="white",
     relief="flat",
     bd=0
-).pack(pady=8)
+).pack(
+    pady=8
+)
 
+
+# ==========================================
+# CRUD - CONSULTAR
+# ==========================================
+
+tk.Button(
+    frame_botones,
+    text="Consultar paciente",
+    command=consultar_paciente,
+    width=25,
+    height=2,
+    bg="#00A6A6",
+    fg="white",
+    relief="flat",
+    bd=0
+).pack(
+    pady=8
+)
+
+
+# ==========================================
+# CRUD - ACTUALIZAR
+# ==========================================
+
+tk.Button(
+    frame_botones,
+    text="Actualizar paciente",
+    command=actualizar_desde_ventana,
+    width=25,
+    height=2,
+    bg="#3A86FF",
+    fg="white",
+    relief="flat",
+    bd=0
+).pack(
+    pady=8
+)
+
+
+# ==========================================
+# CRUD - ELIMINAR
+# ==========================================
+
+tk.Button(
+    frame_botones,
+    text="Eliminar paciente",
+    command=eliminar_desde_ventana,
+    width=25,
+    height=2,
+    bg="#E63946",
+    fg="white",
+    relief="flat",
+    bd=0
+).pack(
+    pady=8
+)
+
+
+# ==========================================
+# SALIR
+# ==========================================
 
 tk.Button(
     frame_botones,
@@ -1121,7 +2270,9 @@ tk.Button(
     activeforeground="white",
     relief="flat",
     bd=0
-).pack(pady=8)
+).pack(
+    pady=8
+)
 
 
 # ==========================================
@@ -1157,7 +2308,10 @@ resultado_texto.pack(
     expand=True
 )
 
-resultado_texto.config(state="disabled")
+
+resultado_texto.config(
+    state="disabled"
+)
 
 
 # ==========================================
@@ -1168,7 +2322,9 @@ tk.Label(
     root,
     text="Sistema académico de simulación hospitalaria",
     font=("Arial", 9)
-).pack(pady=5)
+).pack(
+    pady=5
+)
 
 
 # ==========================================
